@@ -8,6 +8,7 @@ from torch.nn.parameter import Parameter
 
 from sglang.srt.distributed import get_tensor_model_parallel_world_size
 from sglang.srt.layers.amx_utils import _amx_process_weight_after_loading
+from sglang.srt.layers.layernorm import RMSNorm, RMSNormQuant
 from sglang.srt.layers.moe import MoeRunner, MoeRunnerBackend, MoeRunnerConfig
 from sglang.srt.layers.moe.moe_runner.triton import TritonMoeQuantInfo
 from sglang.srt.layers.parameter import (
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
         CombineInput,
         StandardDispatchOutput,
     )
+
+from sglang.srt.managers.schedule_batch import global_server_args_dict
 
 _is_cuda = is_cuda()
 _is_cpu_amx_available = cpu_has_amx_support()
@@ -624,6 +627,8 @@ class NPU_W8A8LinearMethodImpl:
                 -1,
                 False,
             )
+        if "quantization" in global_server_args_dict:
+            original_dtype = torch.bfloat16
         # Only fuse bias add into GEMM for rank 0 (this ensures that
         # bias will not get added more than once in Attention TP>1 case)
         if isinstance(layer, RowParallelLinear) and layer.tp_rank > 0:
